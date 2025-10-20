@@ -25,10 +25,15 @@ export interface Transaction {
   timestamp: number;
   status: 'Completed' | 'Pending' | 'Failed';
 }
-
 export interface FraudAlert {
-    transactionHash: string;
-    reason: string;
-    severity: 'Low' | 'Medium' | 'High';
-    timestamp: string;
+  transactionHash: string;
+  reason: string;
+  severity: 'Low' | 'Medium' | 'High';
+  timestamp: string;
+}
+
+// Extended type for real-time prediction
+export interface RealTimeFraudAlert extends FraudAlert {
+  fraud: boolean;
+  probability: number;
 }

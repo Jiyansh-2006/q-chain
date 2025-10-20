@@ -1,28 +1,42 @@
-
+// src/frontend/dashboard.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWallet } from '../hooks/useWallet';
 import { FraudAlert, NFT } from '../types';
 import Card from '../components/Card';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { getFraudAlerts } from '../services/geminiService';
+import { checkTransactionFraud } from '../services/fraudService';
 
 const Dashboard: React.FC = () => {
     const { address, qTokenBalance, nfts, loading: walletLoading } = useWallet();
     const [alerts, setAlerts] = useState<FraudAlert[]>([]);
     const [alertsLoading, setAlertsLoading] = useState<boolean>(true);
 
-    useEffect(() => {
-        const fetchAlerts = async () => {
-            setAlertsLoading(true);
-            const fetchedAlerts = await getFraudAlerts();
-            setAlerts(fetchedAlerts);
-            setAlertsLoading(false);
-        };
-        fetchAlerts();
-    }, []);
+    // Fetch recent transactions and run AI fraud detection
+    const fetchFraudAlerts = async () => {
+        setAlertsLoading(true);
 
-    // Fix: Cannot find namespace 'JSX'. Replaced JSX.Element with React.ReactElement.
+        // Example transactions - replace with real wallet transactions
+        const transactions = [
+            { amount: 2.5, fee: 0.01, sender_wallet: address!, receiver_wallet: "0xABC", timestamp: new Date().toISOString() },
+            { amount: 10, fee: 0.05, sender_wallet: address!, receiver_wallet: "0xDEF", timestamp: new Date().toISOString() },
+            { amount: 0.1, fee: 0.001, sender_wallet: address!, receiver_wallet: "0xGHI", timestamp: new Date().toISOString() }
+        ];
+
+        const fetchedAlerts: FraudAlert[] = [];
+        for (const tx of transactions) {
+            const alert = await checkTransactionFraud(tx);
+            if (alert.fraud) fetchedAlerts.push(alert);
+        }
+
+        setAlerts(fetchedAlerts);
+        setAlertsLoading(false);
+    };
+
+    useEffect(() => {
+        if (address) fetchFraudAlerts();
+    }, [address]);
+
     const QuickAction: React.FC<{ to: string, label: string, icon: React.ReactElement }> = ({ to, label, icon }) => (
         <Link to={to} className="flex flex-col items-center justify-center p-4 bg-dark-border/50 rounded-lg hover:bg-dark-border transition-colors text-center">
             <div className="text-brand-primary mb-2">{icon}</div>
@@ -36,7 +50,7 @@ const Dashboard: React.FC = () => {
             case 'Medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500';
             case 'Low': return 'bg-blue-500/20 text-blue-400 border-blue-500';
         }
-    }
+    };
 
     if (walletLoading) {
         return <div className="flex justify-center items-center h-64"><LoadingSpinner size="lg" /></div>;
@@ -45,11 +59,13 @@ const Dashboard: React.FC = () => {
     return (
         <div className="space-y-8">
             <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card title="QToken Balance">
                     <p className="text-4xl font-bold text-white">{qTokenBalance} <span className="text-xl text-brand-secondary">QTOK</span></p>
                     <p className="text-sm text-slate-400">Connected: {address?.substring(0, 10)}...</p>
                 </Card>
+
                 <Card title="Quick Actions" className="md:col-span-2">
                     <div className="grid grid-cols-3 gap-4">
                         <QuickAction to="/mint" label="Mint QuantumID" icon={<MintIcon />} />
@@ -76,19 +92,36 @@ const Dashboard: React.FC = () => {
                         <p className="text-slate-400">You don't own any QuantumID NFTs yet.</p>
                     )}
                 </Card>
-                
+
                 <Card title="AI Fraud Alerts" icon={<AlertIcon />}>
                     {alertsLoading ? <LoadingSpinner /> : (
-                         <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                            {alerts.map((alert, index) => (
-                                <div key={index} className={`p-3 rounded-lg border ${severityColor(alert.severity)}`}>
-                                    <div className="flex justify-between items-start">
-                                        <p className="text-sm font-semibold">{alert.reason}</p>
-                                        <span className="text-xs font-mono px-2 py-1 rounded bg-slate-700">{alert.severity}</span>
+                        <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                            {alerts.length === 0 ? (
+                                <p className="text-slate-400">No suspicious transactions detected.</p>
+                            ) : (
+                                alerts.map((alert, index) => (
+                                    <div key={index} className={`p-3 rounded-lg border ${severityColor(alert.severity as 'Low'|'Medium'|'High')}`}>
+                                        <div className="flex justify-between items-start">
+                                            <p className="text-sm font-semibold">{alert.reason}</p>
+                                            <span className="text-xs font-mono px-2 py-1 rounded bg-slate-700">{alert.severity}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1 font-mono">{alert.transactionHash.substring(0, 20)}...</p>
+
+                                        {/* Fraud probability bar */}
+                                        <div className="mt-2 w-full bg-slate-700 rounded-full h-2">
+                                            <div
+                                                className={`h-2 rounded-full ${
+                                                    alert.severity === 'High' ? 'bg-red-500' :
+                                                    alert.severity === 'Medium' ? 'bg-yellow-400' :
+                                                    'bg-blue-400'
+                                                }`}
+                                                style={{ width: `${Math.round(alert.probability * 100)}%` }}
+                                            ></div>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">{Math.round(alert.probability * 100)}% suspicious</p>
                                     </div>
-                                    <p className="text-xs text-slate-500 mt-1 font-mono">{alert.transactionHash.substring(0, 20)}...</p>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                     )}
                 </Card>
